@@ -2,7 +2,6 @@
 #ifndef ONNX_UTILS_H
 #define ONNX_UTILS_H
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,6 +19,16 @@ typedef struct {
   OrtAllocator *allocator;
 } OnnxModel;
 
+// should we just put this in `OnnxModel` bro...
+typedef struct {
+  size_t num_input_nodes;
+  size_t num_output_nodes;
+  char input_name;
+  char output_name;
+  OrtMemoryInfo *mem_info;
+} OnnxModelInfo;
+
+
 static inline void onnx_model_check_status(const OrtApi *api,
                                            OrtStatus *status) {
   if (status != NULL) {
@@ -30,25 +39,29 @@ static inline void onnx_model_check_status(const OrtApi *api,
   }
 }
 
+
+
+
 /// gets input/output names, dims and memory info
-static inline void onnx_model_get_info(OnnxModel *model,
-                                       size_t *num_input_nodes,
-                                       size_t *num_output_nodes,
-                                       char *input_name, char *output_name,
-                                       OrtMemoryInfo *mem_info) {
+static inline OnnxModelInfo onnx_model_get_info(OnnxModel *model) {
   if (!model) {
     fprintf(stderr, "INVALID OnnxModel!");
-    return;
   }
+  size_t num_input_nodes;
+  size_t num_output_nodes;
+  char *input_name;
+  char *output_name;
+  OrtMemoryInfo *mem_info;
+  OnnxModelInfo model_info;
   OrtStatus *status = NULL;
-  status = model->api->SessionGetInputCount(model->session, num_input_nodes);
+  status = model->api->SessionGetInputCount(model->session, &num_input_nodes);
   onnx_model_check_status(model->api, status);
 
   status = model->api->SessionGetInputName(model->session, 0, model->allocator,
                                            &input_name);
   onnx_model_check_status(model->api, status);
 
-  status = model->api->SessionGetOutputCount(model->session, num_output_nodes);
+  status = model->api->SessionGetOutputCount(model->session, &num_output_nodes);
   onnx_model_check_status(model->api, status);
 
   status = model->api->SessionGetOutputName(model->session, 0, model->allocator,
@@ -57,7 +70,9 @@ static inline void onnx_model_get_info(OnnxModel *model,
   model->api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault,
                                   &mem_info);
   onnx_model_check_status(model->api, status);
+  return model_info;
 }
+
 
 static inline OnnxModel *onnx_model_load(const char *model_path) {
   OnnxModel *model = (OnnxModel *)malloc(sizeof(OnnxModel));
